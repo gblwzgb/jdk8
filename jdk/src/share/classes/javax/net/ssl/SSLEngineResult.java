@@ -105,11 +105,13 @@ public class SSLEngineResult {
      * @author Brad R. Wetmore
      * @since 1.5
      */
+    // 一个 SSLEngineResult 枚举，描述此 SSLEngine 的当前握手状态。
     public static enum HandshakeStatus {
 
         /**
          * The <code>SSLEngine</code> is not currently handshaking.
          */
+        // SSLEngine当前未握手。
         NOT_HANDSHAKING,
 
         /**
@@ -124,6 +126,9 @@ public class SSLEngineResult {
          * @see SSLEngine#unwrap(ByteBuffer, ByteBuffer)
          * @see SSLEngine#getHandshakeStatus()
          */
+        // SSLEngine 刚刚完成握手。
+        // 该值仅在调用完成一次握手时才通过调用 SSLEngine.wrap()/unwrap() 生成。
+        // 它永远不会由 SSLEngine.getHandshakeStatus() 生成。
         FINISHED,
 
         /**
@@ -132,6 +137,7 @@ public class SSLEngineResult {
          *
          * @see SSLEngine#getDelegatedTask()
          */
+        // SSLEngine 需要一个（或多个）委派任务的结果，然后握手才能继续。
         NEED_TASK,
 
         /**
@@ -141,12 +147,14 @@ public class SSLEngineResult {
          *
          * @see SSLEngine#wrap(ByteBuffer, ByteBuffer)
          */
+        // SSLEngine 必须先将数据发送到远程端，然后才能继续握手，因此应调用SSLEngine.wrap()。
         NEED_WRAP,
 
         /**
          * The <code>SSLEngine</code> needs to receive data from the
          * remote side before handshaking can continue.
          */
+        // SSLEngine 需要先从远程接收数据，然后才能继续进行握手。
         NEED_UNWRAP;
     }
 

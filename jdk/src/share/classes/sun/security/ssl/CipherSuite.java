@@ -322,6 +322,7 @@ final class CipherSuite implements Comparable<CipherSuite> {
 
     /**
      * An SSL/TLS key exchange algorithm.
+     * （SSL/TLS密钥交换算法。）
      */
     static enum KeyExchange {
 

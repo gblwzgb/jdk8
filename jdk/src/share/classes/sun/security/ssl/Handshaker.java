@@ -1224,10 +1224,14 @@ abstract class Handshaker {
         handshakeState.changeCipherSpec(true, isClient);
     }
 
-    /*
+    /**
      * Single access point to key calculation logic.  Given the
      * pre-master secret and the nonces from client and server,
      * produce all the keying material to be used.
+     */
+    /**
+     * key 计算逻辑的单一访问点。
+     * 给定 pre-master secret 以及客户端和服务器的随机数，请生成所有要使用的密钥材料。
      */
     void calculateKeys(SecretKey preMasterSecret, ProtocolVersion version) {
         SecretKey master = calculateMasterSecret(preMasterSecret, version);
@@ -1236,7 +1240,7 @@ abstract class Handshaker {
     }
 
 
-    /*
+    /**
      * Calculate the master secret from its various components.  This is
      * used for key exchange by all cipher suites.
      *
@@ -1244,6 +1248,12 @@ abstract class Handshaker {
      * consisting of the pre-master secret and a SHA1 hash.  Those three
      * SHA1 hashes are of (different) constant strings, the pre-master
      * secret, and the nonces provided by the client and the server.
+     */
+    /**
+     * 从其各个组成部分计算 master secret。所有密码套件均将其用于密钥交换。
+     *
+     * master secret 是三个MD5哈希的组合，每个哈希由 pre-master secret 和SHA1哈希组成。
+     * 这三个SHA1散列具有（不同的）恒定字符串，pre-master secret 以及客户端和服务器提供的随机数。
      */
     @SuppressWarnings("deprecation")
     private SecretKey calculateMasterSecret(SecretKey preMasterSecret,
@@ -1300,6 +1310,7 @@ abstract class Handshaker {
                     preMasterSecret, protocolVersion.major, protocolVersion.minor,
                     sessionHash, prfHashAlg, prfHashLength, prfBlockSize);
         } else {
+            // 客户端 preMasterSecret、协议主版本、协议次版本、客户端 random1、服务端 random2
             spec = new TlsMasterSecretParameterSpec(
                     preMasterSecret, protocolVersion.major, protocolVersion.minor,
                     clnt_random.random_bytes, svr_random.random_bytes,
@@ -1309,6 +1320,7 @@ abstract class Handshaker {
         try {
             KeyGenerator kg = JsseJce.getKeyGenerator(masterAlg);
             kg.init(spec);
+            // 生成了 random3
             return kg.generateKey();
         } catch (InvalidAlgorithmParameterException |
                 NoSuchAlgorithmException iae) {
@@ -1530,7 +1542,7 @@ abstract class Handshaker {
 
     /*
      * See if there are any tasks which need to be delegated
-     *
+     * （查看是否有任何任务需要委托）
      * Locked by SSLEngine.this.
      */
     boolean taskOutstanding() {

@@ -28,6 +28,9 @@
 #include "runtime/globals.hpp"
 #include "utilities/globalDefinitions.hpp"
 
+// OBJECT 层次
+// 该层次结构是表示层次结构，即，如果A是B的超类，则A的表示形式是B表示形式的前缀。
+
 // OBJECT hierarchy
 // This hierarchy is a representation hierarchy, i.e. if A is a superclass
 // of B, A's representation is a prefix of B's representation.

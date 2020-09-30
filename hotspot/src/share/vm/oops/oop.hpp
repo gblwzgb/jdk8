@@ -32,6 +32,13 @@
 #include "utilities/macros.hpp"
 #include "utilities/top.hpp"
 
+// oopDesc 是对象类的顶级基础类。
+// {name}Desc 类描述Java对象的格式，因此可以从C++访问这些字段。
+// oopDesc 是抽象的。
+// （有关完整的oop类层次结构，请参见oopHierarchy）
+//
+// 不允许使用虚拟功能
+
 // oopDesc is the top baseclass for objects classes.  The {name}Desc classes describe
 // the format of Java objects so the fields can be accessed from C++.
 // oopDesc is abstract.
@@ -59,7 +66,7 @@ class ParCompactionManager;
 class oopDesc {
   friend class VMStructs;
  private:
-  volatile markOop  _mark;
+  volatile markOop  _mark;  // 对象头
   union _metadata {
     Klass*      _klass;
     narrowKlass _compressed_klass;

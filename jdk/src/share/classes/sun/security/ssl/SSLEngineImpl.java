@@ -166,8 +166,11 @@ final public class SSLEngineImpl extends SSLEngine {
      */
     private int                 connectionState;
 
+    // 从构造函数开始，直到出现TCP连接为止。
     private static final int    cs_START = 0;
+    // 在允许流量之前选择会话参数。 由于顺序要求，握手消息有很多子状态。
     private static final int    cs_HANDSHAKE = 1;
+    // 可以发送数据。
     private static final int    cs_DATA = 2;
     private static final int    cs_RENEGOTIATE = 3;
     private static final int    cs_ERROR = 4;
@@ -293,7 +296,9 @@ final public class SSLEngineImpl extends SSLEngine {
 
     /*
      * Crypto state that's reinitialized when the session changes.
+     * （session 更改时将重新初始化的加密状态。）
      */
+    // 在客户端发来 ct_change_cipher_spec 的消息后，会调用 changeReadCiphers() ，之后所有的消息都会使用这个来解密
     private Authenticator       readAuthenticator, writeAuthenticator;
     private CipherBox           readCipher, writeCipher;
     // NOTE: compression state would be saved here
@@ -484,6 +489,7 @@ final public class SSLEngineImpl extends SSLEngine {
         } else { // cs_DATA
             connectionState = cs_RENEGOTIATE;
         }
+        // 创建 ServerHandshaker 或 ClientHandshaker
         if (roleIsServer) {
             handshaker = new ServerHandshaker(this, sslContext,
                     enabledProtocols, doClientAuth,
@@ -516,11 +522,13 @@ final public class SSLEngineImpl extends SSLEngine {
 
         synchronized (this) {
             if (writer.hasOutboundData()) {
+                // 有待加密的内容
                 return HandshakeStatus.NEED_WRAP;
             } else if (handshaker != null) {
-                if (handshaker.taskOutstanding()) {
+                if (handshaker.taskOutstanding()) {  // 是否有任务要委托
                     return HandshakeStatus.NEED_TASK;
                 } else {
+                    // 有需要解码的内容
                     return HandshakeStatus.NEED_UNWRAP;
                 }
             } else if (connectionState == cs_CLOSED) {
@@ -682,6 +690,7 @@ final public class SSLEngineImpl extends SSLEngine {
                 throw new IllegalStateException(
                     "Client/Server mode not yet set.");
             }
+            // 初始化 Handshaker
             initHandshaker();
             break;
 
@@ -733,6 +742,7 @@ final public class SSLEngineImpl extends SSLEngine {
 
             if (handshaker instanceof ClientHandshaker) {
                 // send client hello
+                // 发送 client hello 消息
                 handshaker.kickstart();
             } else {    // instanceof ServerHandshaker
                 if (connectionState == cs_HANDSHAKE) {
@@ -772,6 +782,7 @@ final public class SSLEngineImpl extends SSLEngine {
      * Unwraps a buffer.  Does a variety of checks before grabbing
      * the unwrapLock, which blocks multiple unwraps from occurring.
      */
+    // 打开缓冲区。在获取 unwrapLock 之前进行各种检查，这将阻止发生多个 unwraps。
     @Override
     public SSLEngineResult unwrap(ByteBuffer netData, ByteBuffer [] appData,
             int offset, int length) throws SSLException {
@@ -820,8 +831,10 @@ final public class SSLEngineImpl extends SSLEngine {
 
         /*
          * Check if we are closing/closed.
+         * （检查我们是否要关闭/已关闭。）
          */
         if (isInboundDone()) {
+            // 返回【已关闭】
             return new SSLEngineResult(Status.CLOSED, getHSStatus(null), 0, 0);
         }
 
@@ -835,8 +848,8 @@ final public class SSLEngineImpl extends SSLEngine {
                 kickstartHandshake();
 
                 /*
-                 * If there's still outbound data to flush, we
-                 * can return without trying to unwrap anything.
+                 * If there's still outbound data to flush, we can return without trying to unwrap anything.
+                 * （如果仍然有待 flush 的出站数据，我们可以返回而不尝试 unwrap 任何东西。）
                  */
                 hsStatus = getHSStatus(null);
 
@@ -910,6 +923,7 @@ final public class SSLEngineImpl extends SSLEngine {
          * HandshakeCompletedListeners.
          */
         try {
+            /** 这里 */
             hsStatus = readRecord(ea);
         } catch (SSLException e) {
             throw e;
@@ -977,6 +991,7 @@ final public class SSLEngineImpl extends SSLEngine {
              * throw a fatal alert if the integrity check fails.
              */
             try {
+                /** 解码，这里的 readAuthenticator、readCipher 一开始是空的，就是不解码，当客户端发送 ct_change_cipher_spec 消息过来的时候，才会指定一个解码方式 */
                 decryptedBB = inputRecord.decrypt(
                                     readAuthenticator, readCipher, readBB);
             } catch (BadPaddingException e) {
@@ -997,8 +1012,9 @@ final public class SSLEngineImpl extends SSLEngine {
              */
 
             synchronized (this) {
+                // 这些可以看看网上的 wireshark 抓包分析 https 的文章
                 switch (inputRecord.contentType()) {
-                case Record.ct_handshake:
+                case Record.ct_handshake:  // SSL 握手阶段的 contentType
                     /*
                      * Handshake messages always go to a pending session
                      * handshaker ... if there isn't one, create one.  This
@@ -1029,6 +1045,7 @@ final public class SSLEngineImpl extends SSLEngine {
                      * The handshaker state machine will ensure that it's
                      * a finished message.
                      */
+                    /** 重要 */
                     handshaker.process_record(inputRecord, expectingFinished);
                     expectingFinished = false;
 
@@ -1078,8 +1095,7 @@ final public class SSLEngineImpl extends SSLEngine {
                     }
 
                     /*
-                     * Don't return data once the inbound side is
-                     * closed.
+                     * Don't return data once the inbound side is closed.
                      */
                     if (!inboundDone) {
                         ea.scatter(decryptedBB.slice());
@@ -1091,6 +1107,8 @@ final public class SSLEngineImpl extends SSLEngine {
                     break;
 
                 case Record.ct_change_cipher_spec:
+                    // // 编码改变通知。这一步是客户端通知服务端后面再发送的消息都会使用前面协商出来的秘钥加密了，是一条事件消息。
+
                     if ((connectionState != cs_HANDSHAKE
                                 && connectionState != cs_RENEGOTIATE)) {
                         // For the CCS message arriving in the wrong state
@@ -1112,6 +1130,7 @@ final public class SSLEngineImpl extends SSLEngine {
                     // machine.
                     //
                     handshaker.receiveChangeCipherSpec();
+                    // 指定解密形式，后续读到的 socket 都会使用这个来解密
                     changeReadCiphers();
                     // next message MUST be a finished message
                     expectingFinished = true;

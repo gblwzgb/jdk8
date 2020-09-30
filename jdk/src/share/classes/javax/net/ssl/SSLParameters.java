@@ -78,7 +78,9 @@ public class SSLParameters {
 
     private String[] cipherSuites;
     private String[] protocols;
+    // 设置是否应请求客户端身份验证。调用此方法将清除needClientAuth标志。
     private boolean wantClientAuth;
+    // 是否需要客户端身份验证。调用此方法将清除wantClientAuth标志。
     private boolean needClientAuth;
     private String identificationAlgorithm;
     private AlgorithmConstraints algorithmConstraints;
@@ -187,6 +189,7 @@ public class SSLParameters {
      *
      * @param wantClientAuth whether client authentication should be requested
      */
+    // 设置是否应请求客户端身份验证。调用此方法将清除needClientAuth标志。
     public void setWantClientAuth(boolean wantClientAuth) {
         this.wantClientAuth = wantClientAuth;
         this.needClientAuth = false;
@@ -207,6 +210,7 @@ public class SSLParameters {
      *
      * @param needClientAuth whether client authentication should be required
      */
+    // 设置是否需要客户端身份验证。调用此方法将清除wantClientAuth标志。
     public void setNeedClientAuth(boolean needClientAuth) {
         this.wantClientAuth = false;
         this.needClientAuth = needClientAuth;

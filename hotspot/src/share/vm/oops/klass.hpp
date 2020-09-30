@@ -148,8 +148,10 @@ class Klass : public Metadata {
   // Ordered list of all primary supertypes
   Klass*      _primary_supers[_primary_super_limit];
   // java/lang/Class instance mirroring this class
+  // 镜像此类的java/lang/Class实例
   oop       _java_mirror;
   // Superclass
+  // 超类
   Klass*      _super;
   // First subclass (NULL if none); _subklass->next_sibling() is next one
   Klass*      _subklass;
@@ -157,18 +159,24 @@ class Klass : public Metadata {
   Klass*      _next_sibling;
 
   // All klasses loaded by a class loader are chained through these links
+  // 通过类加载器加载的所有klasses通过这些链接连接在一起
   Klass*      _next_link;
 
   // The VM's representation of the ClassLoader used to load this class.
   // Provide access the corresponding instance java.lang.ClassLoader.
+  // 用于加载此类的VM对ClassLoader的表示。
+  // 提供访问相应实例java.lang.ClassLoader的权限。
   ClassLoaderData* _class_loader_data;
 
+  // 处理的访问标志，由Class.getModifiers使用。
   jint        _modifier_flags;  // Processed access flags, for use by Class.getModifiers.
+  // 访问标志。类/接口的区别存储在这里。
   AccessFlags _access_flags;    // Access flags. The class/interface distinction is stored here.
 
   // Biased locking implementation and statistics
   // (the 64-bit chunk goes first, to avoid some fragmentation)
   jlong    _last_biased_lock_bulk_revocation_time;
+  // 偏向锁同时启用和禁用此类型时使用
   markOop  _prototype_header;   // Used when biased locking is both enabled and disabled for this type
   jint     _biased_lock_revocation_count;
 

@@ -324,8 +324,11 @@ void ATTR ObjectMonitor::enter(TRAPS) {
   Thread * const Self = THREAD ;
   void * cur ;
 
+  // CAS 将 monitor 的持有者，改成当前线程。（处于轻量级锁->重量级锁的情况下，因为 owner 记录的是 BasicLock，所以这个 CAS 都会失败）
   cur = Atomic::cmpxchg_ptr (Self, &_owner, NULL) ;
+  // case1：无锁变有锁
   if (cur == NULL) {
+     // CAS成功，即获得重量级锁成功
      // Either ASSERT _recursions == 0 or explicitly set _recursions = 0.
      assert (_recursions == 0   , "invariant") ;
      assert (_owner      == Self, "invariant") ;
@@ -333,19 +336,23 @@ void ATTR ObjectMonitor::enter(TRAPS) {
      return ;
   }
 
+  // case2：重量级锁重入了
   if (cur == Self) {
+     // 重入这个锁了，递归次数+1
      // TODO-FIXME: check for integer overflow!  BUGID 6557169.
      _recursions ++ ;
      return ;
   }
 
-  if (Self->is_lock_owned ((address)cur)) {
+  // case3：轻量级锁信息转移到重量级锁
+  if (Self->is_lock_owned ((address)cur)) {  // 是当前线程获得的轻量级锁
+    //
     assert (_recursions == 0, "internal state error");
-    _recursions = 1 ;
+    _recursions = 1 ;  // 设置重入次数
     // Commute owner from a thread-specific on-stack BasicLockObject address to
     // a full-fledged "Thread *".
-    _owner = Self ;
-    OwnerIsThread = 1 ;
+    _owner = Self ;  // 设置 monitor 持有者
+    OwnerIsThread = 1 ;  // owner 记录的是线程了
     return ;
   }
 
@@ -387,6 +394,7 @@ void ATTR ObjectMonitor::enter(TRAPS) {
   }
 
   { // Change java thread status to indicate blocked on monitor enter.
+    // 更改 Java 线程状态以指示在进入 monitor 时被阻止。
     JavaThreadBlockedOnMonitorEnterState jtbmes(jt, this);
 
     Self->set_current_pending_monitor(this);
@@ -505,6 +513,7 @@ int ObjectMonitor::TryLock (Thread * Self) {
    }
 }
 
+// 排队
 void ATTR ObjectMonitor::EnterI (TRAPS) {
     Thread * Self = THREAD ;
     assert (Self->is_Java_thread(), "invariant") ;
@@ -561,6 +570,7 @@ void ATTR ObjectMonitor::EnterI (TRAPS) {
     ObjectWaiter * nxt ;
     for (;;) {
         node._next = nxt = _cxq ;
+        // cas 入队
         if (Atomic::cmpxchg_ptr (&node, &_cxq, nxt) == nxt) break ;
 
         // Interference - the CAS failed because _cxq changed.  Just retry.
@@ -1672,7 +1682,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
    guarantee (_recursions == 0, "invariant") ;
    _recursions = save;     // restore the old recursion count
-   _waiters--;             // decrement the number of waiters
+   _waiters--;             // decrement the number of waiters  // 排队线程数 -1
 
    // Verify a few postconditions
    assert (_owner == Self       , "invariant") ;
@@ -1684,9 +1694,10 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
    }
 
    // check if the notification happened
-   if (!WasNotified) {
+   if (!WasNotified) {  // 是否被通知
      // no, it could be timeout or Thread.interrupt() or both
      // check for interrupt event, otherwise it is timeout
+     // 未被通知，则可能是超时或者被中断了
      if (interruptible && Thread::is_interrupted(Self, true) && !HAS_PENDING_EXCEPTION) {
        TEVENT (Wait - throw IEX from epilog) ;
        THROW(vmSymbols::java_lang_InterruptedException());

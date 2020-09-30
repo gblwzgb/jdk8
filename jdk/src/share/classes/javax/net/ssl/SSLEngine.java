@@ -590,6 +590,24 @@ public abstract class SSLEngine {
     public abstract SSLEngineResult wrap(ByteBuffer [] srcs, int offset,
             int length, ByteBuffer dst) throws SSLException;
 
+
+    /**
+     * 尝试将SSL/TLS网络数据解码为纯文本应用程序数据缓冲区。
+     *
+     * 对该方法的调用与该调用的行为完全相同：
+     *
+     * <blockquote><pre>
+     * {@link #unwrap(ByteBuffer, ByteBuffer [], int, int)
+     *     engine.unwrap(src, new ByteBuffer [] { dst }, 0, 1);}
+     * </pre></blockquote>
+     *
+     * @param   src
+     *          a <code>ByteBuffer</code> containing inbound network data.
+     * @param   dst
+     *          a <code>ByteBuffer</code> to hold inbound application data.
+     * @return  an <code>SSLEngineResult</code> describing the result
+     *          of this operation.
+     */
     /**
      * Attempts to decode SSL/TLS network data into a plaintext
      * application data buffer.

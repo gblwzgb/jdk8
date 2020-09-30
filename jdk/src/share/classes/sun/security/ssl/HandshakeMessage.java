@@ -76,6 +76,7 @@ public abstract class HandshakeMessage {
     HandshakeMessage() { }
 
     // enum HandshakeType:
+    // 这些数值是 SSL 协议规定的，遵从 SSL 协议的规范
     static final byte   ht_hello_request = 0;
     static final byte   ht_client_hello = 1;
     static final byte   ht_server_hello = 2;
@@ -1915,11 +1916,15 @@ static final class Finished extends HandshakeMessage {
         input.read(verifyData);
     }
 
-    /*
+    /**
      * Verify that the hashes here are what would have been produced
      * according to a given set of inputs.  This is used to ensure that
      * both client and server are fully in sync, and that the handshake
      * computations have been successful.
+     */
+    /**
+     * 验证这里的哈希值是根据给定输入集产生的。
+     * 这用于确保客户端和服务器完全同步，并且握手计算已成功进行。
      */
     boolean verify(HandshakeHash handshakeHash, int sender, SecretKey master) {
         byte[] myFinished = getFinished(handshakeHash, sender, master);

@@ -196,7 +196,7 @@ final class ServerHandshaker extends Handshaker {
         doClientAuth = clientAuth;
     }
 
-    /*
+    /**
      * This routine handles all the server side handshake messages, one at
      * a time.  Given the message type (and in some cases the pending cipher
      * spec) it parses the type-specific message.  Then it calls a function
@@ -204,6 +204,12 @@ final class ServerHandshaker extends Handshaker {
      *
      * It updates the state machine as each message is processed, and writes
      * responses as needed using the connection in the constructor.
+     */
+    /**
+     * 此例程一次处理所有 server 端握手消息。
+     * 给定消息类型（在某些情况下，还有待处理的密码规范），它将解析特定于类型的消息。
+     * 然后，它调用一个处理该特定消息的函数。
+     * 它在处理每个消息时更新状态机，并使用构造函数中的连接根据需要写入响应。
      */
     @Override
     void processMessage(byte type, int message_len)
@@ -222,7 +228,7 @@ final class ServerHandshaker extends Handshaker {
                 this.clientHello(ch);
                 break;
 
-            case HandshakeMessage.ht_certificate:
+            case HandshakeMessage.ht_certificate:  // 这个应该是处理客户端发来的证书的吧，一般用于双向加密
                 if (doClientAuth == SSLEngineImpl.clauth_none) {
                     fatalSE(Alerts.alert_unexpected_message,
                                 "client sent unsolicited cert chain");
@@ -233,9 +239,9 @@ final class ServerHandshaker extends Handshaker {
                 this.clientCertificate(certificateMsg);
                 break;
 
-            case HandshakeMessage.ht_client_key_exchange:
+            case HandshakeMessage.ht_client_key_exchange:  // 合法性验证通过之后，客户端计算产生随机数字 Pre-master，并用证书公钥加密，发送给服务器;
                 SecretKey preMasterSecret;
-                switch (keyExchange) {
+                switch (keyExchange) {  // 这个已经在
                 case K_RSA:
                 case K_RSA_EXPORT:
                     /*
@@ -244,11 +250,14 @@ final class ServerHandshaker extends Handshaker {
                      * temporary one used for non-export or signing-only
                      * certificates/keys.
                      */
+                    // 传给客户端用的是 ServerKeyExchange 对象，这里解析客户端传过来的用 ClientKeyExchange
+                    /** 这里会使用私钥解码出 pre-master */
                     RSAClientKeyExchange pms = new RSAClientKeyExchange(
                             protocolVersion, clientRequestedVersion,
                             sslContext.getSecureRandom(), input,
                             message_len, privateKey);
                     handshakeState.update(pms, resumingSession);
+                    // 构造方法已经解析出了 preMaster
                     preMasterSecret = this.clientKeyExchange(pms);
                     break;
                 case K_KRB5:
@@ -300,6 +309,7 @@ final class ServerHandshaker extends Handshaker {
                 // All keys are calculated from the premaster secret
                 // and the exchanged nonces in the same way.
                 //
+                /** 计算出 master key，也叫 random3，后续使用该值来做对称加密 */
                 calculateKeys(preMasterSecret, clientRequestedVersion);
                 break;
 
@@ -325,7 +335,7 @@ final class ServerHandshaker extends Handshaker {
     }
 
 
-    /*
+    /**
      * ClientHello presents the server with a bunch of options, to which the
      * server replies with a ServerHello listing the ones which this session
      * will use.  If needed, it also writes its Certificate plus in some cases
@@ -334,6 +344,13 @@ final class ServerHandshaker extends Handshaker {
      *
      * All these messages are terminated by a ServerHelloDone message.  In
      * most cases, all this can be sent in a single Record.
+     */
+    /**
+     * ClientHello为服务器提供了很多选项，服务器会用ServerHello答复这些选项，其中列出了此会话将使用的选项。
+     * 如果需要，它还会写入其证书以及某些情况下的ServerKeyExchange消息。
+     * 它还可以编写一个CertificateRequest，以获取客户端证书。
+     * 所有这些消息都由ServerHelloDone消息终止。
+     * 在大多数情况下，所有这些都可以在单个记录中发送。
      */
     private void clientHello(ClientHello mesg) throws IOException {
         if (debug != null && Debug.isOn("handshake")) {
@@ -562,8 +579,10 @@ final class ServerHandshaker extends Handshaker {
          * There are a bunch of minor tasks here, and one major one: deciding
          * if the short or the full handshake sequence will be used.
          */
+        /** ① 和 ClientHello 相应，创建一个 ServerHello 消息 */
         ServerHello m1 = new ServerHello();
 
+        // 客户端请求的 TLS 版本
         clientRequestedVersion = mesg.protocolVersion;
 
         // select a proper protocol version.
@@ -571,6 +590,7 @@ final class ServerHandshaker extends Handshaker {
                selectProtocolVersion(clientRequestedVersion);
         if (selectedVersion == null ||
                 selectedVersion.v == ProtocolVersion.SSL20Hello.v) {
+            // 客户端请求的 TLS 版本不支持
             fatalSE(Alerts.alert_handshake_failure,
                 "Client requested protocol " + clientRequestedVersion +
                 " not enabled or not supported");
@@ -579,6 +599,7 @@ final class ServerHandshaker extends Handshaker {
         handshakeHash.protocolDetermined(selectedVersion);
         setVersion(selectedVersion);
 
+        // TLS 协议的版本
         m1.protocolVersion = protocolVersion;
 
         //
@@ -592,7 +613,9 @@ final class ServerHandshaker extends Handshaker {
         // its own authenticated (and strong) keys.  One could make
         // creation of a session a rare thing...
         //
+        // 客户端传过来的随机数
         clnt_random = mesg.clnt_random;
+        // 服务端的随机数，传给客户端，用来生成 master secret
         svr_random = new RandomCookie(sslContext.getSecureRandom());
         m1.svr_random = svr_random;
 
@@ -602,9 +625,12 @@ final class ServerHandshaker extends Handshaker {
         // the client's asked to rejoin an existing session, and the server
         // permits this; (b) the other one, where a new session is created.
         //
+        /** 1.1 恢复会话模块 */
         if (mesg.sessionId.length() != 0) {
             // client is trying to resume a session, let's see...
+            // （客户端正在尝试恢复会话）
 
+            // 根据客户端传过来的 sessionId，获取相应的 SSLSessionImpl 实例
             SSLSessionImpl previous = ((SSLSessionContextImpl)sslContext
                         .engineGetServerSessionContext())
                         .get(mesg.sessionId.getId());
@@ -615,12 +641,13 @@ final class ServerHandshaker extends Handshaker {
             // client requested, and if we're not forgetting any needed
             // authentication on the part of the client.
             //
-            if (previous != null) {
+            if (previous != null) {  // SSLSessionImpl 实例存在
                 resumingSession = previous.isRejoinable();
 
                 if (resumingSession) {
                     ProtocolVersion oldVersion = previous.getProtocolVersion();
                     // cannot resume session with different version
+                    // （协议版本不同，无法恢复session）
                     if (oldVersion != mesg.protocolVersion) {
                         resumingSession = false;
                     }
@@ -661,6 +688,7 @@ final class ServerHandshaker extends Handshaker {
                 }
 
                 // cannot resume session with different server name indication
+                // （SNI不同，无法恢复会话）
                 if (resumingSession) {
                     List<SNIServerName> oldServerNames =
                             previous.getRequestedServerNames();
@@ -761,6 +789,8 @@ final class ServerHandshaker extends Handshaker {
                     // verify that the ciphersuite from the cached session
                     // is in the list of client requested ciphersuites and
                     // we have it enabled
+
+                    // 加密套件有问题，无法恢复会话
                     if ((isNegotiable(suite) == false) ||
                             (mesg.getCipherSuites().contains(suite) == false)) {
                         resumingSession = false;
@@ -768,11 +798,13 @@ final class ServerHandshaker extends Handshaker {
                         // everything looks ok, set the ciphersuite
                         // this should be done last when we are sure we
                         // will resume
+                        /** 校验通过，使用该 session 的加密套件 */
                         setCipherSuite(suite);
                     }
                 }
 
                 if (resumingSession) {
+                    // 会话恢复了！！
                     session = previous;
                     if (debug != null &&
                         (Debug.isOn("handshake") || Debug.isOn("session"))) {
@@ -787,7 +819,7 @@ final class ServerHandshaker extends Handshaker {
         // new one and choose its cipher suite and compression options.
         // Unless new session creation is disabled for this connection!
         //
-        if (session == null) {
+        if (session == null) {  // 创建一个新的 session
             if (!enableNewSession) {
                 throw new SSLException("Client did not resume a session");
             }
@@ -822,6 +854,7 @@ final class ServerHandshaker extends Handshaker {
                 } // else, need to use peer implicit supported signature algs
             }
 
+            // 创建一个 session
             session = new SSLSessionImpl(protocolVersion, CipherSuite.C_NULL,
                         getLocalSupportedSignAlgs(),
                         sslContext.getSecureRandom(),
@@ -850,9 +883,11 @@ final class ServerHandshaker extends Handshaker {
             setHandshakeSessionSE(session);
 
             // choose cipher suite and corresponding private key
+            // （选择密码套件和相应的私钥）
             chooseCipherSuite(mesg);
 
             session.setSuite(cipherSuite);
+            // 设置 session 关联的私钥
             session.setLocalPrivateKey(privateKey);
 
             // chooseCompression(mesg);
@@ -865,6 +900,7 @@ final class ServerHandshaker extends Handshaker {
             handshakeHash.setFinishedAlg(cipherSuite.prfAlg.getPRFHashAlg());
         }
 
+        /** 告诉客户端密码套件，sessionId */
         m1.cipherSuite = cipherSuite;
         m1.sessionId = session.getSessionId();
         m1.compression_method = session.getCompression();
@@ -934,15 +970,16 @@ final class ServerHandshaker extends Handshaker {
             m1.print(System.out);
             System.out.println("Cipher suite:  " + session.getSuite());
         }
+        // 发送 ht_server_hello 消息
         m1.write(output);
         handshakeState.update(m1, resumingSession);
 
         //
-        // If we are resuming a session, we finish writing handshake
-        // messages right now and then finish.
-        //
+        // If we are resuming a session, we finish writing handshake messages right now and then finish.
+        // （如果要恢复会话，则现在要完成写握手消息，然后再完成。）
         if (resumingSession) {
             calculateConnectionKeys(session.getMasterSecret());
+            // 发送 change_cipher_spec，代表后续的消息都会加密发送
             sendChangeCipherAndFinish(false);
             return;
         }
@@ -956,14 +993,22 @@ final class ServerHandshaker extends Handshaker {
          * defined in the protocol spec are explicitly stated to require
          * using RSA certificates.
          */
+        /*
+         * 第二，如果需要，写服务器证书。
+         *
+         * 注意：尽管协议明确允许“匿名RSA”模式，
+         * 但由于协议规范中明确规定的所有SSL风格都明确要求使用RSA证书，因此我们不支持该模式。
+         */
+        /** ② 发送证书，非必须 */
         if (keyExchange == K_KRB5 || keyExchange == K_KRB5_EXPORT) {
             // Server certificates are omitted for Kerberos ciphers
-
+            // （Kerberos密码省略服务器证书）
         } else if ((keyExchange != K_DH_ANON) && (keyExchange != K_ECDH_ANON)) {
             if (certs == null) {
                 throw new RuntimeException("no certificates");
             }
 
+            // fixme：这里传过去的应该是证书链吧
             CertificateMsg m2 = new CertificateMsg(certs);
 
             /*
@@ -974,6 +1019,7 @@ final class ServerHandshaker extends Handshaker {
             if (debug != null && Debug.isOn("handshake")) {
                 m2.print(System.out);
             }
+            // 发送 ht_certificate 消息
             m2.write(output);
             handshakeState.update(m2, resumingSession);
 
@@ -996,9 +1042,19 @@ final class ServerHandshaker extends Handshaker {
          * exportable ciphers used with big RSA keys need to downgrade
          * to use short RSA keys, even when the key/cert encrypts OK.
          */
-
+        /*
+         * 第三，ServerKeyExchange消息...（如果需要）。
+         *
+         * 除非具有加密功能的RSA证书或D-H证书，否则通常需要使用它。
+         * 值得注意的例外是与大RSA密钥一起使用的可导出密码需要降级以使用短RSA密钥，即使密钥/证书已加密也可以。
+         */
+        /** ③ 发送公钥，非必须 */
         ServerKeyExchange m3;
-        switch (keyExchange) {
+        /*
+         * DH：Diffie-Hellman
+         * ECDH：Ellipticcurve Diffie–Hellman
+         */
+        switch (keyExchange) {  // SSL/TLS密钥交换算法。这个在 chooseCipherSuite 方法或者成功的会话恢复中指定
         case K_RSA:
         case K_KRB5:
         case K_KRB5_EXPORT:
@@ -1070,6 +1126,7 @@ final class ServerHandshaker extends Handshaker {
             if (debug != null && Debug.isOn("handshake")) {
                 m3.print(System.out);
             }
+            // 发送 ht_server_key_exchange
             m3.write(output);
             handshakeState.update(m3, resumingSession);
         }
@@ -1085,6 +1142,15 @@ final class ServerHandshaker extends Handshaker {
         // Illegal for anonymous flavors, so we need to check that.
         //
         // CertificateRequest is omitted for Kerberos ciphers
+        //
+        // 第四，CertificateRequest消息。
+        // 消息的详细信息可能会受到使用中的密钥交换算法的影响。
+        // 例如，具有固定Diffie-Hellman密钥的证书仅对DH_DSS和DH_RSA密钥交换算法有用。
+        //
+        // 仅当服务器要求客户端进行自我认证时才需要。非法使用匿名口味，因此我们需要进行检查。
+        //
+        // Kerberos密码省略了CertificateRequest
+        /** ④ 发送 CertificateRequest 消息，双向验证时使用，非必须 */
         if (doClientAuth != SSLEngineImpl.clauth_none &&
                 keyExchange != K_DH_ANON && keyExchange != K_ECDH_ANON &&
                 keyExchange != K_KRB5 && keyExchange != K_KRB5_EXPORT) {
@@ -1121,17 +1187,22 @@ final class ServerHandshaker extends Handshaker {
                 m4.print(System.out);
             }
             m4.write(output);
+            // 发送
             handshakeState.update(m4, resumingSession);
         }
 
         /*
          * FIFTH, say ServerHelloDone.
+         * （第五，说ServerHelloDone。）
          */
+        /** ⑤ 发送 server_hello 消息，必须 */
         ServerHelloDone m5 = new ServerHelloDone();
 
         if (debug != null && Debug.isOn("handshake")) {
             m5.print(System.out);
         }
+        // 发送 14 给客户端 ，ht_server_hello_done = 14
+        // 通知客户端 server_hello 信息发送结束
         m5.write(output);
         handshakeState.update(m5, resumingSession);
 
@@ -1601,6 +1672,12 @@ final class ServerHandshaker extends Handshaker {
      *
      * @return true if successful, false if not available or invalid
      */
+    /**
+     * 从KeyManager检索指定算法的服务器密钥和证书，并设置实例变量。
+     *
+     * @param algorithm
+     * @return
+     */
     private boolean setupPrivateKeyAndChain(String algorithm) {
         X509ExtendedKeyManager km = sslContext.getX509KeyManager();
         String alias;
@@ -1640,7 +1717,9 @@ final class ServerHandshaker extends Handshaker {
                 return false;
             }
         }
+        // 设置秘钥
         this.privateKey = tempPrivateKey;
+        // 设置证书链
         this.certs = tempCerts;
         return true;
     }
@@ -1857,6 +1936,7 @@ final class ServerHandshaker extends Handshaker {
          * Verify the client's message with the "before" digest of messages,
          * and forget about continuing to use that digest.
          */
+        /** 摘要验证，防止信息被篡改 */
         boolean verified = mesg.verify(handshakeHash, Finished.CLIENT,
             session.getMasterSecret());
 
@@ -1880,6 +1960,7 @@ final class ServerHandshaker extends Handshaker {
          */
         if (!resumingSession) {
             input.digestNow();
+            /** 发送 change_cipher_spec , 后续发送的消息，都会经过加密了吧*/
             sendChangeCipherAndFinish(true);
         } else {
             handshakeFinished = true;
@@ -1971,11 +2052,16 @@ final class ServerHandshaker extends Handshaker {
         throw new SSLProtocolException("handshake alert: " + message);
     }
 
-    /*
+    /**
      * RSA key exchange is normally used.  The client encrypts a "pre-master
      * secret" with the server's public key, from the Certificate (or else
      * ServerKeyExchange) message that was sent to it by the server.  That's
      * decrypted using the private key before we get here.
+     */
+    /**
+     * 通常使用 RSA key exchange。
+     * 客户端使用服务器的公钥，从服务器发送给它的证书（或ServerKeyExchange）消息中加密“pre-master secret”。
+     * 在到达此处之前，已使用私钥对其进行了解密。
      */
     private SecretKey clientKeyExchange(RSAClientKeyExchange mesg)
             throws IOException {

@@ -90,6 +90,7 @@ import sun.misc.HexDumpEncoder;
  * @author David Brownell
  * @author Andreas Sterbenz
  */
+// 此类处理每个SSLv3消息的批量数据加密/解密。
 final class CipherBox {
 
     // A CipherBox that implements the identity operation
@@ -334,7 +335,7 @@ final class CipherBox {
         }
     }
 
-    /*
+    /**
      * Encrypts a ByteBuffer block of data, returning the size of the
      * resulting block.
      *
@@ -342,6 +343,16 @@ final class CipherBox {
      * to encrypt.  On return, the position and limit are
      * set to last position padded/encrypted.  The limit may have changed
      * because of the added padding bytes.
+     */
+    /**
+     * 加密 ByteBuffer 数据块，返回 结果块​​ 的大小。
+     *
+     * 字节缓冲区的 position 和 limit 最初定义了要加密的数量。
+     * 返回时，position 和 limit 设置为填充/加密的最后位置。
+     * 由于增加了填充字节，limit 可能已更改。
+     * @param bb
+     * @param outLimit
+     * @return
      */
     int encrypt(ByteBuffer bb, int outLimit) {
 

@@ -28,6 +28,17 @@ package sun.security.ssl;
 import java.util.Arrays;
 
 /**
+ * 此类表示SSL/TLS消息认证令牌，该令牌封装序列号并确保可以检测到删除或重新排序消息的尝试。
+ *
+ * 每个SSL/TLS连接状态都包含一个序列号，该序列号针对读取和写入状态分别维护。
+ * 每当将连接状态设为活动状态时，序列号务必设置为零。
+ * 序列号的类型为uint64，并且不能超过2^64-1。
+ * 序列号不 wrap。
+ * 如果SSL/TLS实现需要 wrap 序列号，则必须重新协商。
+ * 在每条记录之后，序列号递增：具体地说，在特定连接状态下传输的第一条记录务必使用序列号0。
+ */
+
+/**
  * This class represents an SSL/TLS message authentication token,
  * which encapsulates a sequence number and ensures that attempts to
  * delete or reorder messages can be detected.

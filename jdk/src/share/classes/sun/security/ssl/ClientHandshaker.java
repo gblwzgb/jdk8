@@ -202,11 +202,14 @@ final class ClientHandshaker extends Handshaker {
         case HandshakeMessage.ht_hello_request:
             HelloRequest helloRequest = new HelloRequest(input);
             handshakeState.update(helloRequest, resumingSession);
+            // 服务端发了一个 ht_hello_request 消息过来，我方在内部可能发起 client_hello 消息
+            // 服务端断了所以发这个消息？
             this.serverHelloRequest(helloRequest);
             break;
 
         case HandshakeMessage.ht_server_hello:
             ServerHello serverHello = new ServerHello(input, messageLen);
+            // 处理服务端的 ht_server_hello 消息
             this.serverHello(serverHello);
 
             // This handshake state update needs the resumingSession value
@@ -223,12 +226,15 @@ final class ClientHandshaker extends Handshaker {
             }
             CertificateMsg certificateMsg = new CertificateMsg(input);
             handshakeState.update(certificateMsg, resumingSession);
+            // 处理服务端的 ht_server_hello 消息，这个会传证书
             this.serverCertificate(certificateMsg);
             serverKey =
                 session.getPeerCertificates()[0].getPublicKey();
             break;
 
         case HandshakeMessage.ht_server_key_exchange:
+            // sever key exchange 的作用是 server certificate 没有携带足够的信息时，
+            // 发送给客户端以计算 pre-master，如基于 DH 的证书，公钥不被证书中包含，需要单独发送;
             serverKeyExchangeReceived = true;
             switch (keyExchange) {
             case K_RSA_EXPORT:
@@ -467,10 +473,12 @@ final class ClientHandshaker extends Handshaker {
                 "by the client.");
         }
 
+        // 根据版本，选择 hash 算法？
         handshakeHash.protocolDetermined(mesgVersion);
 
         // Set protocolVersion and propagate to SSLSocket and the
         // Handshake streams
+        // 设置 TLS 协议版本
         setVersion(mesgVersion);
 
         // check the "renegotiation_info" extension
@@ -540,6 +548,7 @@ final class ClientHandshaker extends Handshaker {
         // keys and it's also used to create the master secret if we're
         // creating a new session (i.e. in the full handshake).
         //
+        // 服务端的随机数 random2
         svr_random = mesg.svr_random;
 
         if (isNegotiable(mesg.cipherSuite) == false) {
@@ -547,6 +556,7 @@ final class ClientHandshaker extends Handshaker {
                 "Server selected improper ciphersuite " + mesg.cipherSuite);
         }
 
+        // 服务端选择的密码套件
         setCipherSuite(mesg.cipherSuite);
         if (protocolVersion.v >= ProtocolVersion.TLS12.v) {
             handshakeHash.setFinishedAlg(cipherSuite.prfAlg.getPRFHashAlg());
@@ -759,6 +769,7 @@ final class ClientHandshaker extends Handshaker {
         }
 
         // Create a new session, we need to do the full handshake
+        // 创建一个新的 session
         session = new SSLSessionImpl(protocolVersion, cipherSuite,
                             getLocalSupportedSignAlgs(),
                             mesg.sessionId, getHostSE(), getPortSE(),

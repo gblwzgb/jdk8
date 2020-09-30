@@ -160,7 +160,7 @@ import sun.security.jca.*;
  * @see SecretKey
  * @since 1.4
  */
-
+// 此类提供用于加密和解密的密码算法的功能。
 public class Cipher {
 
     private static final Debug debug =

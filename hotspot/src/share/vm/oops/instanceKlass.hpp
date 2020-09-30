@@ -184,10 +184,13 @@ class InstanceKlass: public Klass {
 
  protected:
   // Annotations for this class
+  // 此类的注解
   Annotations*    _annotations;
   // Array classes holding elements of this class.
+  // 包含此类的元素的数组类。
   Klass*          _array_klasses;
   // Constant pool for this class.
+  // 此类的常量池
   ConstantPool* _constants;
   // The InnerClasses attribute and EnclosingMethod attribute. The
   // _inner_classes is an array of shorts. If the class has InnerClasses
@@ -246,6 +249,7 @@ class InstanceKlass: public Klass {
   Thread*         _init_thread;          // Pointer to current thread doing initialization (to handle recursive initialization)
   int             _vtable_len;           // length of Java vtable (in words)
   int             _itable_len;           // length of Java itable (in words)
+  // OopMapCache用于klass中的所有方法（延迟分配）
   OopMapCache*    volatile _oop_map_cache;   // OopMapCache for all methods in the klass (allocated lazily)
   MemberNameTable* _member_names;        // Member names
   JNIid*          _jni_ids;              // First JNI identifier for static fields in this class
@@ -272,8 +276,10 @@ class InstanceKlass: public Klass {
   NOT_PRODUCT(int _verify_count;)  // to avoid redundant verifies
 
   // Method array.
+  // 方法数组
   Array<Method*>* _methods;
   // Default Method Array, concrete methods inherited from interfaces
+  // 默认方法数组，从接口继承的具体方法
   Array<Method*>* _default_methods;
   // Interface (Klass*s) this class declares locally to implement.
   Array<Klass*>* _local_interfaces;

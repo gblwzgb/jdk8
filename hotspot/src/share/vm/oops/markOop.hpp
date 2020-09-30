@@ -27,6 +27,13 @@
 
 #include "oops/oop.hpp"
 
+// markOop 描述对象的 header。
+//
+// 请注意，mark 不是真正的 oop，而只是一个 word。
+// 由于历史原因，它被放置在 oop 层次结构中。
+//
+// object header 的位格式（以下为最高有效位，以下为大字节序排列）：
+
 // The markOop describes the header of an object.
 //
 // Note that the mark is not a real oop but just a word.
@@ -108,9 +115,9 @@ class markOopDesc: public oopDesc {
 
  public:
   // Constants
-  enum { age_bits                 = 4,
-         lock_bits                = 2,
-         biased_lock_bits         = 1,
+  enum { age_bits                 = 4,  // 4bit，表示分代年龄，转成十进制最多15
+         lock_bits                = 2,  // 2bit，锁标记
+         biased_lock_bits         = 1,  // 1bit，是否偏向锁
          max_hash_bits            = BitsPerWord - age_bits - lock_bits - biased_lock_bits,
          hash_bits                = max_hash_bits > 31 ? 31 : max_hash_bits,
          cms_bits                 = LP64_ONLY(1) NOT_LP64(0),
@@ -155,11 +162,11 @@ class markOopDesc: public oopDesc {
                             (address_word)hash_mask << hash_shift;
 #endif
 
-  enum { locked_value             = 0,
-         unlocked_value           = 1,
-         monitor_value            = 2,
-         marked_value             = 3,
-         biased_lock_pattern      = 5
+  enum { locked_value             = 0,  // 00，轻量级锁？
+         unlocked_value           = 1,  // 01，无锁
+         monitor_value            = 2,  // 10，重量级锁
+         marked_value             = 3,  // 11，GC标记
+         biased_lock_pattern      = 5   // 101，偏向锁
   };
 
   enum { no_hash                  = 0 };  // no hash value assigned
@@ -178,6 +185,7 @@ class markOopDesc: public oopDesc {
   // by the lower-level CAS-based locking code, although the runtime
   // fixes up biased locks to be compatible with it when a bias is
   // revoked.
+  // 目前处于偏向锁状态下
   bool has_bias_pattern() const {
     return (mask_bits(value(), biased_lock_mask_in_place) == biased_lock_pattern);
   }
@@ -185,8 +193,8 @@ class markOopDesc: public oopDesc {
     assert(has_bias_pattern(), "should not call this otherwise");
     return (JavaThread*) ((intptr_t) (mask_bits(value(), ~(biased_lock_mask_in_place | age_mask_in_place | epoch_mask_in_place))));
   }
-  // Indicates that the mark has the bias bit set but that it has not
-  // yet been biased toward a particular thread
+  // Indicates that the mark has the bias bit set but that it has not yet been biased toward a particular thread
+  // 表示该标记已设置了偏置位，但尚未将其偏置到特定线程（最后3bit是101，但是偏向的线程id为null）
   bool is_biased_anonymously() const {
     return (has_bias_pattern() && (biased_locker() == NULL));
   }
@@ -214,12 +222,14 @@ class markOopDesc: public oopDesc {
   bool is_locked()   const {
     return (mask_bits(value(), lock_mask_in_place) != unlocked_value);
   }
+  // 最后两位是不是01，是就是无锁
   bool is_unlocked() const {
     return (mask_bits(value(), biased_lock_mask_in_place) == unlocked_value);
   }
   bool is_marked()   const {
     return (mask_bits(value(), lock_mask_in_place) == marked_value);
   }
+  // 是否中立，和上面的 is_unlocked 没区别啊。。
   bool is_neutral()  const { return (mask_bits(value(), biased_lock_mask_in_place) == unlocked_value); }
 
   // Special temporary state of the markOop while being inflated.
@@ -274,13 +284,16 @@ class markOopDesc: public oopDesc {
   bool has_locker() const {
     return ((value() & lock_mask_in_place) == locked_value);
   }
+  // 指向 BasicLock 的指针，Lock Record
   BasicLock* locker() const {
     assert(has_locker(), "check");
     return (BasicLock*) value();
   }
   bool has_monitor() const {
+    // 有 monitor ，即重量级锁。&上 10 即可。
     return ((value() & monitor_value) != 0);
   }
+  // ObjectMonitor的指针地址？markword除掉最后两位锁标记就是
   ObjectMonitor* monitor() const {
     assert(has_monitor(), "check");
     // Use xor instead of &~ to provide one extra tag-bit check.
@@ -289,6 +302,7 @@ class markOopDesc: public oopDesc {
   bool has_displaced_mark_helper() const {
     return ((value() & unlocked_value) == 0);
   }
+  // 获取 lock record 的指针
   markOop displaced_mark_helper() const {
     assert(has_displaced_mark_helper(), "check");
     intptr_t ptr = (value() & ~monitor_value);
@@ -314,6 +328,7 @@ class markOopDesc: public oopDesc {
   static markOop encode(BasicLock* lock) {
     return (markOop) lock;
   }
+  // monitor 指针地址【或上】重量级锁
   static markOop encode(ObjectMonitor* monitor) {
     intptr_t tmp = (intptr_t) monitor;
     return (markOop) (tmp | monitor_value);
@@ -350,6 +365,7 @@ class markOopDesc: public oopDesc {
   }
 
   // Prototype mark for initialization
+  // 用于初始化的原型标记
   static markOop prototype() {
     return markOop( no_hash_in_place | no_lock_in_place );
   }

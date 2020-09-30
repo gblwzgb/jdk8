@@ -32,7 +32,7 @@
 class BasicLock VALUE_OBJ_CLASS_SPEC {
   friend class VMStructs;
  private:
-  volatile markOop _displaced_header;
+  volatile markOop _displaced_header;  // 替代的 header
  public:
   markOop      displaced_header() const               { return _displaced_header; }
   void         set_displaced_header(markOop header)   { _displaced_header = header; }
@@ -44,6 +44,9 @@ class BasicLock VALUE_OBJ_CLASS_SPEC {
 
   static int displaced_header_offset_in_bytes()       { return offset_of(BasicLock, _displaced_header); }
 };
+
+// BasicObjectLock将特定的Java对象与BasicLock相关联。
+// 它当前嵌入在解释器框架中。
 
 // A BasicObjectLock associates a specific Java object with a BasicLock.
 // It is currently embedded in an interpreter frame.
