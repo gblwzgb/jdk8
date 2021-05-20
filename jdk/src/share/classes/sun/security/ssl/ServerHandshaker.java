@@ -585,7 +585,7 @@ final class ServerHandshaker extends Handshaker {
         // 客户端请求的 TLS 版本
         clientRequestedVersion = mesg.protocolVersion;
 
-        // select a proper protocol version.
+        // select a proper protocol version.  （选择适当的协议版本。）
         ProtocolVersion selectedVersion =
                selectProtocolVersion(clientRequestedVersion);
         if (selectedVersion == null ||
@@ -599,7 +599,7 @@ final class ServerHandshaker extends Handshaker {
         handshakeHash.protocolDetermined(selectedVersion);
         setVersion(selectedVersion);
 
-        // TLS 协议的版本
+        // 服务端选定的 TLS 协议的版本
         m1.protocolVersion = protocolVersion;
 
         //
@@ -1059,6 +1059,7 @@ final class ServerHandshaker extends Handshaker {
         case K_KRB5:
         case K_KRB5_EXPORT:
             // no server key exchange for RSA or KRB5 ciphersuites
+            // 这几种加密算法，是不需要的
             m3 = null;
             break;
         case K_RSA_EXPORT:
